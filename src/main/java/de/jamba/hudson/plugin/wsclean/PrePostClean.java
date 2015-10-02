@@ -97,15 +97,15 @@ public class PrePostClean extends BuildWrapper {
 			// project isn't instance of TopLevelItem and probably doesn't have fixed workspace location
 			// let's iterate over build history and wipe out used workspace locations
 			HashSet<String> cleanedNodes = new HashSet<String>();
-			AbstractBuild previousBuild = build;
+			AbstractBuild previousBuild = (AbstractBuild) build.getPreviousBuild();
 			while (previousBuild != null) {
-				previousBuild = (AbstractBuild) previousBuild.getPreviousBuild();
 				Node node = previousBuild.getBuiltOn();
 				String nodeName = node.getNodeName();
 				if (!cleanedNodes.contains(nodeName) && !runNode.equals(nodeName)) {
 					cleanedNodes.add(nodeName);
 					deleteWorkspace(previousBuild.getWorkspace(), listener, nodeName);
 				}
+				previousBuild = (AbstractBuild) previousBuild.getPreviousBuild();
 			}
 		}
 	}
