@@ -88,60 +88,46 @@ public class PrePostClean extends BuildWrapper {
 			if (nodesForLabel != null) {
 				for (Node node : nodesForLabel) {
 					if (!runNode.equals(node.getNodeName())) {
-						String normalizedName = "".equals(node.getNodeName()) ? "master"
-								: node.getNodeName();
-						deleteWorkspace(
-								node.getWorkspaceFor((TopLevelItem) project),
-								listener, normalizedName);
+						String normalizedName = "".equals(node.getNodeName()) ? "master" : node.getNodeName();
+						deleteWorkspace(node.getWorkspaceFor((TopLevelItem) project), listener, normalizedName);
 					}
 				}
 			}
 		} else {
-			// project isn't instance of TopLevelItem and probably doesn't have
-			// fixed workspace location
-			// let's iterate over build history and wipe out used workspace
-			// locations
+			// project isn't instance of TopLevelItem and probably doesn't have fixed workspace location
+			// let's iterate over build history and wipe out used workspace locations
 			HashSet<String> cleanedNodes = new HashSet<String>();
 			AbstractBuild previousBuild = build;
 			while (previousBuild != null) {
-				previousBuild = (AbstractBuild) previousBuild
-						.getPreviousBuild();
+				previousBuild = (AbstractBuild) previousBuild.getPreviousBuild();
 				Node node = previousBuild.getBuiltOn();
 				String nodeName = node.getNodeName();
-				if (!cleanedNodes.contains(nodeName)
-						&& !runNode.equals(nodeName)) {
+				if (!cleanedNodes.contains(nodeName) && !runNode.equals(nodeName)) {
 					cleanedNodes.add(nodeName);
-					deleteWorkspace(previousBuild.getWorkspace(), listener,
-							nodeName);
+					deleteWorkspace(previousBuild.getWorkspace(), listener, nodeName);
 				}
 			}
 		}
 	}
 
-	private void deleteWorkspace(FilePath fp, BuildListener listener,
-			String nodeName) {
+	private void deleteWorkspace(FilePath fp, BuildListener listener, String nodeName) {
 		listener.getLogger().println("cleaning on " + nodeName);
 
 		if (fp == null) {
-			listener.getLogger().println(
-					"No workspace found on " + nodeName
-							+ ". Node is maybe offline.");
+			listener.getLogger().println("No workspace found on " + nodeName + ". Node is maybe offline.");
 			return;
 		}
 
 		try {
 			fp.deleteContents();
 		} catch (IOException e) {
-			listener.getLogger().println(
-					"can't delete on node " + nodeName + "\n" + e.getMessage());
+			listener.getLogger().println("can't delete on node " + nodeName + "\n" + e.getMessage());
 			listener.getLogger().print(e);
 		} catch (InterruptedException e) {
-			listener.getLogger().println(
-					"can't delete on node " + nodeName + "\n" + e.getMessage());
+			listener.getLogger().println("can't delete on node " + nodeName + "\n" + e.getMessage());
 			listener.getLogger().print(e);
 		} catch (RequestAbortedException e) {
-			listener.getLogger().println(
-					"can't delete on node " + nodeName + "\n" + e.getMessage());
+			listener.getLogger().println("can't delete on node " + nodeName + "\n" + e.getMessage());
 		}
 	}
 
