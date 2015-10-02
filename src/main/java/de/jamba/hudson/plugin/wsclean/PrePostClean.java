@@ -14,6 +14,7 @@ import hudson.tasks.BuildWrapper;
 import hudson.tasks.BuildWrapperDescriptor;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Set;
 
 import org.kohsuke.stapler.DataBoundConstructor;
@@ -70,7 +71,6 @@ public class PrePostClean extends BuildWrapper {
 		// select actual running label
 		String runNode = build.getBuiltOnStr();
 
-
 		if (runNode.length() == 0) {
 			listener.getLogger().println("running on master");
 		} else {
@@ -78,51 +78,70 @@ public class PrePostClean extends BuildWrapper {
 		}
 
 		AbstractProject project = build.getProject();
-		Label assignedLabel = project.getAssignedLabel();
-		if (assignedLabel == null) {
- 			listener.getLogger().println("skipping roaming project.");
- 			return;
-        }
- 		Set<Node> nodesForLabel = assignedLabel.getNodes();
-		if (nodesForLabel != null) {
-			for (Node node : nodesForLabel) {
-				if (!runNode.equals(node.getNodeName())) {
-					String normalizedName = "".equals(node.getNodeName()) ? "master" : node.getNodeName();
-						listener.getLogger().println(
-								"cleaning on " + normalizedName);
-						deleteWorkspaceOn(project, listener, node, normalizedName);
+		if (project instanceof TopLevelItem) {
+			Label assignedLabel = project.getAssignedLabel();
+			if (assignedLabel == null) {
+				listener.getLogger().println("skipping roaming project.");
+				return;
+			}
+			Set<Node> nodesForLabel = assignedLabel.getNodes();
+			if (nodesForLabel != null) {
+				for (Node node : nodesForLabel) {
+					if (!runNode.equals(node.getNodeName())) {
+						String normalizedName = "".equals(node.getNodeName()) ? "master"
+								: node.getNodeName();
+						deleteWorkspace(
+								node.getWorkspaceFor((TopLevelItem) project),
+								listener, normalizedName);
+					}
 				}
-
+			}
+		} else {
+			// project isn't instance of TopLevelItem and probably doesn't have
+			// fixed workspace location
+			// let's iterate over build history and wipe out used workspace
+			// locations
+			HashSet<String> cleanedNodes = new HashSet<String>();
+			AbstractBuild previousBuild = build;
+			while (previousBuild != null) {
+				previousBuild = (AbstractBuild) previousBuild
+						.getPreviousBuild();
+				Node node = previousBuild.getBuiltOn();
+				String nodeName = node.getNodeName();
+				if (!cleanedNodes.contains(nodeName)
+						&& !runNode.equals(nodeName)) {
+					cleanedNodes.add(nodeName);
+					deleteWorkspace(previousBuild.getWorkspace(), listener,
+							nodeName);
+				}
 			}
 		}
 	}
 
-	@SuppressWarnings("rawtypes")
-	private void deleteWorkspaceOn(AbstractProject project, BuildListener listener, Node node, String nodeName) {
-		if (project instanceof TopLevelItem) {
-			FilePath fp = node.getWorkspaceFor((TopLevelItem) project);
-			if (fp != null) {
-				try {
-					fp.deleteContents();
-				} catch (IOException e) {
-					listener.getLogger().println(
-							"can't delete on node " + nodeName + "\n" + e.getMessage());
-					listener.getLogger().print(e);
-				} catch (InterruptedException e) {
-					listener.getLogger().println(
-							"can't delete on node " + nodeName + "\n" + e.getMessage());
-					listener.getLogger().print(e);
-				} catch (RequestAbortedException e){
-					listener.getLogger().println(
-							"can't delete on node " + nodeName + "\n" + e.getMessage());
-				}
-				
-			} else {
-				listener.getLogger().println(
-						"No workspace found on " + nodeName + ". Node is maybe offline.");
-			}
-		} else {
-			listener.getLogger().println("Project is no TopLevelItem!? Cannot determine other workspaces!");
+	private void deleteWorkspace(FilePath fp, BuildListener listener,
+			String nodeName) {
+		listener.getLogger().println("cleaning on " + nodeName);
+
+		if (fp == null) {
+			listener.getLogger().println(
+					"No workspace found on " + nodeName
+							+ ". Node is maybe offline.");
+			return;
+		}
+
+		try {
+			fp.deleteContents();
+		} catch (IOException e) {
+			listener.getLogger().println(
+					"can't delete on node " + nodeName + "\n" + e.getMessage());
+			listener.getLogger().print(e);
+		} catch (InterruptedException e) {
+			listener.getLogger().println(
+					"can't delete on node " + nodeName + "\n" + e.getMessage());
+			listener.getLogger().print(e);
+		} catch (RequestAbortedException e) {
+			listener.getLogger().println(
+					"can't delete on node " + nodeName + "\n" + e.getMessage());
 		}
 	}
 
